@@ -1,9 +1,13 @@
+import { getUsersAccounts } from "@/actions/dashboard";
 import CreateAccountDrawer from "@/components/create-account";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus } from "lucide-react";
 import React from "react";
+import AccountCard from "./_components/account-card";
 
-export default function DashBoardPage() {
+export default async function DashBoardPage() {
+  const accounts = await getUsersAccounts();
+
   return (
     <div className="px-5">
       {/*Budget Progress bar*/}
@@ -20,6 +24,10 @@ export default function DashBoardPage() {
             </CardContent>
           </Card>
         </CreateAccountDrawer>
+        {accounts.length > 0 &&
+          accounts?.map((account) => {
+            return <AccountCard key={account.id} account={account} />;
+          })}
       </div>
     </div>
   );
