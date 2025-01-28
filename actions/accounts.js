@@ -91,3 +91,67 @@ export async function getAccountWithTransactions(accountId) {
     transactions: account.transactions.map(serializeTransaction),
   };
 }
+
+export async function bulkDeleteTransactions(transactionIds) {
+  try {
+    const { userId } = await auth();
+    if (!userId) throw new Error("unauthorized");
+
+    const user = await db.user.findUnique({
+      where: { clerkUserId: userId },
+    });
+
+    if (!user) {
+      throw new Error("User not found ");
+    }
+    //* fetching all the transactions
+
+    const transactions = await db.transaction.findMany({
+      where: {
+        id: { in: transactionIds },
+        userId: user.id,
+      },
+    });
+
+    const accountBalanceChanges = transactions.reduce((acc, transaction) => {
+      const change =
+        transaction.type === "INCOME"
+          ? transaction.amount // Income increases the balance
+          : -transaction.amount; // Expense decreases the balance
+
+      acc[transaction.accountId] = (acc[transaction.accountId] || 0) + change;
+
+      return acc;
+    }, {});
+    //* Delete transactions and update account balances in a transactions
+    await db.$transaction(async (tx) => {
+      //* delete transactions
+      await tx.transaction.deleteMany({
+        where: {
+          id: { in: transactionIds },
+          userId: user.id,
+        },
+      });
+      //* for updating account balance
+      // Iterate over all account balance changes
+      for (const [accountId, balanceChange] of Object.entries(
+        accountBalanceChanges
+      )) {
+        // Update the balance of each account in the database
+        await tx.account.update({
+          where: { id: accountId }, // Find the account with the matching ID
+          data: {
+            balance: {
+              increment: balanceChange, // Adjust the balance (add for positive, subtract for negative)
+            },
+          },
+        });
+      }
+    });
+    revalidatePath("/account/[id]");
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
