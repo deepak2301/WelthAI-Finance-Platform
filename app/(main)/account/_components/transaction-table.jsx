@@ -46,6 +46,8 @@ import {
   Search,
   Trash,
   X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
@@ -71,6 +73,8 @@ const TransactionTable = ({ transactions }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [recurringFilter, setRecurringFilter] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const {
     loading: deleteLoading,
@@ -127,6 +131,16 @@ const TransactionTable = ({ transactions }) => {
     return result;
   }, [transactions, searchTerm, typeFilter, recurringFilter, sortConfig]);
 
+  const paginatedTransactions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredAndSortedTransactions.slice(startIndex, endIndex);
+  }, [filteredAndSortedTransactions, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(
+    filteredAndSortedTransactions.length / itemsPerPage
+  );
+
   const handleSort = (field) => {
     setSortConfig((current) => ({
       field,
@@ -173,6 +187,10 @@ const TransactionTable = ({ transactions }) => {
     setTypeFilter("");
     setRecurringFilter("");
     setSelectedIds([]);
+  };
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
   };
 
   return (
@@ -250,9 +268,8 @@ const TransactionTable = ({ transactions }) => {
                 <Checkbox
                   onCheckedChange={handleSelectAll}
                   checked={
-                    selectedIds.length ===
-                      filteredAndSortedTransactions.length &&
-                    filteredAndSortedTransactions.length > 0
+                    selectedIds.length === paginatedTransactions.length &&
+                    paginatedTransactions.length > 0
                   }
                 />
               </TableHead>
@@ -305,7 +322,7 @@ const TransactionTable = ({ transactions }) => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedTransactions.length === 0 ? (
+            {paginatedTransactions.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={7}
@@ -315,7 +332,7 @@ const TransactionTable = ({ transactions }) => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredAndSortedTransactions.map((transaction) => (
+              paginatedTransactions.map((transaction) => (
                 <TableRow key={transaction.id}>
                   <TableCell>
                     <Checkbox
@@ -418,6 +435,101 @@ const TransactionTable = ({ transactions }) => {
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {filteredAndSortedTransactions.length > 0 && (
+        <div className="flex justify-center items-center mt-4">
+          <div className="flex items-center gap-1 rounded-lg border bg-card p-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNumber;
+                if (totalPages <= 5) {
+                  pageNumber = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNumber = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNumber = totalPages - 4 + i;
+                } else {
+                  pageNumber = currentPage - 2 + i;
+                }
+
+                // Show ellipsis for first page when not in view
+                if (currentPage > 3 && pageNumber === 1) {
+                  return (
+                    <React.Fragment key={pageNumber}>
+                      <Button
+                        variant={
+                          currentPage === pageNumber ? "default" : "ghost"
+                        }
+                        size="icon"
+                        onClick={() => handlePageChange(pageNumber)}
+                        className="h-7 w-7"
+                      >
+                        {pageNumber}
+                      </Button>
+                      <span className="text-muted-foreground mx-1">...</span>
+                    </React.Fragment>
+                  );
+                }
+
+                // Show ellipsis for last page when not in view
+                if (currentPage < totalPages - 2 && pageNumber === totalPages) {
+                  return (
+                    <React.Fragment key={pageNumber}>
+                      <span className="text-muted-foreground mx-1">...</span>
+                      <Button
+                        variant={
+                          currentPage === pageNumber ? "default" : "ghost"
+                        }
+                        size="icon"
+                        onClick={() => handlePageChange(pageNumber)}
+                        className="h-7 w-7"
+                      >
+                        {pageNumber}
+                      </Button>
+                    </React.Fragment>
+                  );
+                }
+
+                return (
+                  <Button
+                    key={pageNumber}
+                    variant={currentPage === pageNumber ? "default" : "ghost"}
+                    size="icon"
+                    onClick={() => handlePageChange(pageNumber)}
+                    className="h-7 w-7"
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              })}
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="text-sm text-muted-foreground ml-4">
+            {filteredAndSortedTransactions.length} items
+          </div>
+        </div>
+      )}
     </div>
   );
 };
